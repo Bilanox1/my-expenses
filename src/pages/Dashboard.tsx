@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useCurrentWeek } from "../hooks/useCurrentWeek";
 import { useExpenses } from "../hooks/useExpenses";
 import { useBalance } from "../hooks/useBalance";
 import { exportWeekAsTxt } from "../services/txtExportService";
+import { updateWeeklyBudget } from "../services/weekService";
 import { formatDisplayDate, formatDisplayShortDate } from "../utils/dateUtils";
 import { formatCurrency } from "../utils/moneyUtils";
 import { getWeekDates } from "../utils/weekUtils";
@@ -21,6 +22,43 @@ export function Dashboard() {
   const [editDescription, setEditDescription] = useState("");
   const [editAmount, setEditAmount] = useState("");
   const [editDate, setEditDate] = useState("");
+  const [weeklyBudgetInput, setWeeklyBudgetInput] = useState("210");
+  const [showBudgetSetup, setShowBudgetSetup] = useState(true);
+  const [selectedPreset, setSelectedPreset] = useState("");
+  const [customItem, setCustomItem] = useState("");
+
+  const commonItems = [
+    "Bread",
+    "Eggs",
+    "Tomatoes",
+    "Onion",
+    "Chicken",
+    "Turkey",
+    "Fish",
+    "Tomato sauce",
+    "Water",
+    "Cleaning detergent",
+    "Air freshener",
+    "Bimo",
+    "Olives",
+    "Oranges",
+    "Sugar",
+    "Tea",
+    "Cooking oil",
+    "Spices",
+    "Seasoning",
+    "Rice",
+    "Milk",
+    "Soap",
+    "Dishwashing liquid",
+    "Yogurt",
+    "Fruit",
+    "Vegetables",
+    "Cucumber",
+    "Garlic",
+    "Bananas",
+    "Lentils",
+  ];
 
   const weeklyDays = useMemo(() => {
     if (!week) {
@@ -43,6 +81,35 @@ export function Dashboard() {
 
     return weeklyDays.filter((day) => day.date === searchDate);
   }, [weeklyDays, searchDate]);
+
+  useEffect(() => {
+    if (week) {
+      setWeeklyBudgetInput(String(week.budget));
+    }
+  }, [week]);
+
+  const handleBudgetSave = async () => {
+    try {
+      const parsedBudget = Number(weeklyBudgetInput);
+
+      if (!Number.isFinite(parsedBudget) || parsedBudget <= 0) {
+        setStatus("Weekly budget must be greater than zero.");
+        return;
+      }
+
+      if (!week) {
+        setStatus("The current week is not ready yet.");
+        return;
+      }
+
+      const updatedWeek = await updateWeeklyBudget(parsedBudget);
+      setStatus(`Weekly budget updated to ${formatCurrency(updatedWeek.budget)}.`);
+      setShowBudgetSetup(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Something went wrong while updating the budget.";
+      setStatus(message);
+    }
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -153,13 +220,80 @@ export function Dashboard() {
           </div>
         </div>
 
+        {showBudgetSetup ? (
+          <div className="expense-form">
+            <label>
+              Weekly budget
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={weeklyBudgetInput}
+                onChange={(event) => setWeeklyBudgetInput(event.target.value)}
+                placeholder="210"
+              />
+            </label>
+
+            <button type="button" className="primary-button" onClick={() => void handleBudgetSave()}>
+              Save weekly budget
+            </button>
+          </div>
+        ) : null}
+
         <form className="expense-form" onSubmit={handleSubmit}>
+          <label>
+            Common groceries
+            <select
+              value={selectedPreset}
+              onChange={(event) => {
+                const nextValue = event.target.value;
+                setSelectedPreset(nextValue);
+
+                if (!nextValue) {
+                  setDescription("");
+                  return;
+                }
+
+                if (nextValue === "custom") {
+                  setDescription(customItem);
+                  return;
+                }
+
+                setDescription(nextValue);
+              }}
+            >
+              <option value="">Choose an item...</option>
+              {commonItems.map((item) => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+              <option value="custom">Add custom item</option>
+            </select>
+          </label>
+
+          <label>
+            Or type your item
+            <input
+              type="text"
+              value={customItem}
+              onChange={(event) => {
+                const nextValue = event.target.value;
+                setCustomItem(nextValue);
+                setDescription(nextValue);
+              }}
+              placeholder="Bread, rice, detergent..."
+              aria-label="Custom expense description"
+            />
+          </label>
+
           <label>
             What did you spend on?
             <input
               type="text"
               value={description}
-              onChange={(event) => setDescription(event.target.value)}
+              onChange={(event) => {
+                setDescription(event.target.value);
+                setCustomItem(event.target.value);
+              }}
               placeholder="Tomatoes"
               aria-label="Expense description"
             />

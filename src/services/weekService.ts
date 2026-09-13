@@ -69,3 +69,30 @@ export async function getCurrentWeekId(): Promise<string> {
   const week = await getOrCreateCurrentWeek();
   return week.id;
 }
+
+export async function updateWeeklyBudget(newBudget: number): Promise<Week> {
+  const safeBudget = Number(newBudget);
+
+  if (!Number.isFinite(safeBudget) || safeBudget <= 0) {
+    throw new Error("Weekly budget must be greater than zero.");
+  }
+
+  const currentWeek = await getOrCreateCurrentWeek();
+  const currentSettings = await ensureDefaultSettings();
+
+  await db.settings.put({
+    ...currentSettings,
+    weeklyBudget: safeBudget,
+  });
+
+  await db.weeks.update(currentWeek.id, {
+    budget: safeBudget,
+    deposit: safeBudget,
+  });
+
+  return {
+    ...currentWeek,
+    budget: safeBudget,
+    deposit: safeBudget,
+  };
+}
