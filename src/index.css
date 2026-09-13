@@ -286,6 +286,55 @@ h1 {
   font-weight: 700;
 }
 
+.expense-edit-form {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+}
+
+.expense-edit-form input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: white;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+}
+
+.expense-edit-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.date-search {
+  display: grid;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.date-search input {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+.expense-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.expense-actions button {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
 .empty-state {
   color: #64748b;
   padding: 12px 6px;

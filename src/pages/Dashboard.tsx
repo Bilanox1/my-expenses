@@ -10,12 +10,17 @@ import { getWeekDates } from "../utils/weekUtils";
 
 export function Dashboard() {
   const { week, loading: weekLoading } = useCurrentWeek();
-  const { expenses, saveExpense, removeExpense } = useExpenses(week?.id ?? null);
+  const { expenses, saveExpense, removeExpense, editExpense } = useExpenses(week?.id ?? null);
   const balance = useBalance(week?.budget ?? 0, expenses);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
+  const [searchDate, setSearchDate] = useState("");
+  const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
+  const [editDescription, setEditDescription] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+  const [editDate, setEditDate] = useState("");
 
   const weeklyDays = useMemo(() => {
     if (!week) {
@@ -31,7 +36,13 @@ export function Dashboard() {
     }));
   }, [week, expenses]);
 
-  const today = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const filteredDays = useMemo(() => {
+    if (!searchDate) {
+      return weeklyDays;
+    }
+
+    return weeklyDays.filter((day) => day.date === searchDate);
+  }, [weeklyDays, searchDate]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -61,6 +72,37 @@ export function Dashboard() {
 
     await removeExpense(expenseId);
     setStatus("Expense deleted.");
+  };
+
+  const handleStartEdit = (expense: (typeof expenses)[number]) => {
+    setEditingExpenseId(expense.id ?? null);
+    setEditDescription(expense.description);
+    setEditAmount(String(expense.amount));
+    setEditDate(expense.date);
+  };
+
+  const handleSaveEdit = async (expenseId: number) => {
+    const cleanedDescription = editDescription.trim();
+    const numericAmount = Number(editAmount);
+
+    if (!cleanedDescription) {
+      setStatus("Description is required.");
+      return;
+    }
+
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setStatus("Amount must be greater than zero.");
+      return;
+    }
+
+    await editExpense(expenseId, {
+      description: cleanedDescription,
+      amount: numericAmount,
+      date: editDate,
+    });
+
+    setEditingExpenseId(null);
+    setStatus("Expense updated.");
   };
 
   if (weekLoading || !week) {
@@ -139,45 +181,97 @@ export function Dashboard() {
           <button type="submit" className="primary-button">+ Add expense</button>
         </form>
 
+        <label className="date-search">
+          Search by date
+          <input
+            type="date"
+            value={searchDate}
+            onChange={(event) => setSearchDate(event.target.value)}
+          />
+        </label>
+
         {status ? <p className="status-message">{status}</p> : null}
 
         <section className="week-summary">
           <h3>This week</h3>
 
-          {weeklyDays.map((day) => (
-            <div key={day.date} className="day-summary">
-              <button
-                type="button"
-                className="day-header"
-                onClick={() => setExpandedDay((current) => current === day.date ? null : day.date)}
-              >
-                <span>{formatDisplayDate(day.date)}</span>
-                <span>{formatCurrency(day.total)}</span>
-              </button>
+          {filteredDays.length === 0 ? (
+            <p className="empty-state">No expenses for this date.</p>
+          ) : (
+            filteredDays.map((day) => (
+              <div key={day.date} className="day-summary">
+                <button
+                  type="button"
+                  className="day-header"
+                  onClick={() => setExpandedDay((current) => current === day.date ? null : day.date)}
+                >
+                  <span>{formatDisplayDate(day.date)}</span>
+                  <span>{formatCurrency(day.total)}</span>
+                </button>
 
-              {expandedDay === day.date || day.date === today ? (
-                <div className="day-body">
-                  {day.items.length === 0 ? (
-                    <p className="empty-state">No expenses recorded.</p>
-                  ) : (
-                    <ul className="expense-list compact">
-                      {day.items.map((expense) => (
-                        <li key={expense.id} className="expense-item">
-                          <div>
-                            <p>{expense.description}</p>
-                            <span>{formatCurrency(expense.amount)}</span>
-                          </div>
-                          <button type="button" onClick={() => void handleDelete(expense.id!)} aria-label={`Delete ${expense.description}`}>
-                            Delete
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ) : null}
-            </div>
-          ))}
+                {expandedDay === day.date ? (
+                  <div className="day-body">
+                    {day.items.length === 0 ? (
+                      <p className="empty-state">No expenses recorded.</p>
+                    ) : (
+                      <ul className="expense-list compact">
+                        {day.items.map((expense) => (
+                          <li key={expense.id} className="expense-item">
+                            {editingExpenseId === expense.id ? (
+                              <div className="expense-edit-form">
+                                <input
+                                  type="text"
+                                  value={editDescription}
+                                  onChange={(event) => setEditDescription(event.target.value)}
+                                />
+                                <div className="expense-edit-row">
+                                  <input
+                                    type="number"
+                                    min="0.01"
+                                    step="0.01"
+                                    value={editAmount}
+                                    onChange={(event) => setEditAmount(event.target.value)}
+                                  />
+                                  <input
+                                    type="date"
+                                    value={editDate}
+                                    onChange={(event) => setEditDate(event.target.value)}
+                                  />
+                                </div>
+                                <div className="expense-actions">
+                                  <button type="button" className="secondary-button" onClick={() => void handleSaveEdit(expense.id!)}>
+                                    Save
+                                  </button>
+                                  <button type="button" className="secondary-button" onClick={() => setEditingExpenseId(null)}>
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div>
+                                  <p>{expense.description}</p>
+                                  <span>{formatCurrency(expense.amount)}</span>
+                                </div>
+                                <div className="expense-actions">
+                                  <button type="button" onClick={() => handleStartEdit(expense)} aria-label={`Edit ${expense.description}`}>
+                                    Edit
+                                  </button>
+                                  <button type="button" onClick={() => void handleDelete(expense.id!)} aria-label={`Delete ${expense.description}`}>
+                                    Delete
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            ))
+          )}
         </section>
       </div>
     </main>

@@ -13,6 +13,7 @@ export function History() {
   const [selectedWeek, setSelectedWeek] = useState<Week | null>(null);
   const [expenses, setExpenses] = useState<ReturnType<typeof getExpensesByWeek> extends Promise<infer T> ? T : never>([]);
   const [loading, setLoading] = useState(true);
+  const [searchDate, setSearchDate] = useState("");
 
   useEffect(() => {
     async function loadWeeks() {
@@ -45,6 +46,14 @@ export function History() {
     };
   }, [expenses, selectedWeek]);
 
+  const visibleExpenses = useMemo(() => {
+    if (!searchDate) {
+      return expenses;
+    }
+
+    return expenses.filter((expense) => expense.date === searchDate);
+  }, [expenses, searchDate]);
+
   const handleWeekChange = async (weekId: string) => {
     const week = await getWeekById(weekId);
     if (!week) {
@@ -53,6 +62,7 @@ export function History() {
 
     setSelectedWeekId(weekId);
     setSelectedWeek(week);
+    setSearchDate("");
     setExpenses(await getExpensesByWeek(weekId));
   };
 
@@ -74,6 +84,15 @@ export function History() {
             </button>
           ) : null}
         </header>
+
+        <label className="date-search">
+          Search by date
+          <input
+            type="date"
+            value={searchDate}
+            onChange={(event) => setSearchDate(event.target.value)}
+          />
+        </label>
 
         <div className="history-list">
           {weeks.length === 0 ? (
@@ -115,12 +134,12 @@ export function History() {
               </div>
             </div>
 
-            {expenses.length === 0 ? (
-              <p className="empty-state">No stored expenses for this week.</p>
+            {visibleExpenses.length === 0 ? (
+              <p className="empty-state">No stored expenses for this selection.</p>
             ) : (
               <ul className="history-expense-list">
-                {Array.from(new Map(expenses.map((expense) => [expense.date, [] as typeof expenses])).keys()).sort().map((date) => {
-                  const dayExpenses = expenses.filter((expense) => expense.date === date);
+                {Array.from(new Map(visibleExpenses.map((expense) => [expense.date, [] as typeof visibleExpenses])).keys()).sort().map((date) => {
+                  const dayExpenses = visibleExpenses.filter((expense) => expense.date === date);
                   const dailyTotal = dayExpenses.reduce((sum, expense) => sum + expense.amount, 0);
 
                   return (
